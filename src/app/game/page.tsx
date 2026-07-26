@@ -173,7 +173,28 @@ export default function GameScreen() {
     return () => document.removeEventListener("fullscreenchange", handler);
   }, []);
 
-  // ── Keyboard shortcuts ──
+  const [ctrlPressed, setCtrlPressed] = useState(false);
+
+  // ── Keyboard shortcuts & Ctrl listener ──
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Control" || e.ctrlKey) {
+        setCtrlPressed(true);
+      }
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === "Control" || !e.ctrlKey) {
+        setCtrlPressed(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, []);
+
   useEffect(() => {
     if (!mounted) return;
     const handleKey = (e: KeyboardEvent) => {
@@ -665,13 +686,15 @@ export default function GameScreen() {
                     <button
                       key={g.id}
                       onClick={() => switchToGame(g, i)}
-                      className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors cursor-pointer ${
+                      className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-all cursor-pointer ${
                         i === imageIndex
                           ? "bg-blue-50 text-blue-700 font-medium"
                           : "text-slate-600 hover:bg-slate-50"
                       }`}
                     >
-                      {g.name}
+                      <span className={ctrlPressed ? "blur-none" : "blur-sm select-none hover:blur-none transition-all duration-150"}>
+                        {g.name}
+                      </span>
                     </button>
                   ))}
                 </div>
