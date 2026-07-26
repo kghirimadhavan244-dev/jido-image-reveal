@@ -179,17 +179,23 @@ function ColorInput({
 function ImageUpload({
   value,
   images = [],
+  imageTitles = [],
+  imageAnswers = [],
   onChange,
 }: {
   value: string;
   images?: string[];
-  onChange: (mainUrl: string, imagesList: string[]) => void;
+  imageTitles?: string[];
+  imageAnswers?: string[];
+  onChange: (mainUrl: string, imagesList: string[], titlesList: string[], answersList: string[]) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
   // Combine into a list
   const currentList = images.length > 0 ? images : value ? [value] : [];
+  const titles = currentList.map((_, i) => imageTitles[i] ?? `Slide ${i + 1}`);
+  const answers = currentList.map((_, i) => imageAnswers[i] ?? "");
 
   const readFiles = (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
@@ -198,17 +204,22 @@ function ImageUpload({
 
     let pending = files.length;
     const newUrls: string[] = [];
+    const newTitles: string[] = [];
 
     files.forEach((file) => {
       const reader = new FileReader();
       reader.onload = (e) => {
         if (typeof e.target?.result === "string") {
           newUrls.push(e.target.result);
+          const baseName = file.name.replace(/\.[^.]+$/, "");
+          newTitles.push(baseName);
         }
         pending--;
         if (pending === 0) {
-          const updated = [...currentList, ...newUrls];
-          onChange(updated[0] ?? "", updated);
+          const updatedImages = [...currentList, ...newUrls];
+          const updatedTitles = [...titles, ...newTitles];
+          const updatedAnswers = [...answers, ...newUrls.map(() => "")];
+          onChange(updatedImages[0] ?? "", updatedImages, updatedTitles, updatedAnswers);
         }
       };
       reader.readAsDataURL(file);
@@ -222,8 +233,22 @@ function ImageUpload({
   };
 
   const removeImageAt = (index: number) => {
-    const updated = currentList.filter((_, i) => i !== index);
-    onChange(updated[0] ?? "", updated);
+    const updatedImages = currentList.filter((_, i) => i !== index);
+    const updatedTitles = titles.filter((_, i) => i !== index);
+    const updatedAnswers = answers.filter((_, i) => i !== index);
+    onChange(updatedImages[0] ?? "", updatedImages, updatedTitles, updatedAnswers);
+  };
+
+  const updateTitleAt = (index: number, newTitle: string) => {
+    const updated = [...titles];
+    updated[index] = newTitle;
+    onChange(currentList[0] ?? "", currentList, updated, answers);
+  };
+
+  const updateAnswerAt = (index: number, newAnswer: string) => {
+    const updated = [...answers];
+    updated[index] = newAnswer;
+    onChange(currentList[0] ?? "", currentList, titles, updated);
   };
 
   return (
@@ -242,26 +267,59 @@ function ImageUpload({
       </div>
 
       {currentList.length > 0 ? (
-        /* Image gallery grid */
-        <div className="grid grid-cols-2 gap-3">
+        /* Image gallery grid with title & answer inputs */
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {currentList.map((imgUrl, idx) => (
             <div
               key={idx}
-              className="relative rounded-xl overflow-hidden border border-slate-200 aspect-video bg-slate-100 group"
+              className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden p-3 space-y-2.5 shadow-2xs"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={imgUrl} alt={`Slide ${idx + 1}`} className="w-full h-full object-cover" />
-              <div className="absolute top-1.5 left-1.5 px-2 py-0.5 bg-black/60 text-white text-[10px] font-semibold rounded-full backdrop-blur-xs">
-                Slide {idx + 1}
+              {/* Image Thumbnail */}
+              <div className="relative rounded-lg overflow-hidden border border-slate-200 aspect-video bg-slate-100">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={imgUrl} alt={`Slide ${idx + 1}`} className="w-full h-full object-cover" />
+                <div className="absolute top-1.5 left-1.5 px-2 py-0.5 bg-slate-900/80 text-white text-[10px] font-semibold rounded-full backdrop-blur-xs">
+                  Image {idx + 1}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeImageAt(idx)}
+                  className="absolute top-1.5 right-1.5 p-1 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-sm transition-colors cursor-pointer"
+                  title="Remove image"
+                >
+                  <Trash2 size={12} />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => removeImageAt(idx)}
-                className="absolute top-1.5 right-1.5 p-1 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-sm transition-opacity opacity-90 hover:opacity-100 cursor-pointer"
-                title="Remove image"
-              >
-                <Trash2 size={12} />
-              </button>
+
+              {/* Title & Answer Inputs */}
+              <div className="space-y-2">
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                    Image Name / Title
+                  </label>
+                  <input
+                    type="text"
+                    value={titles[idx] ?? ""}
+                    onChange={(e) => updateTitleAt(idx, e.target.value)}
+                    placeholder={`e.g. Round ${idx + 1} — Image Name`}
+                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                    Answer (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={answers[idx] ?? ""}
+                    onChange={(e) => updateAnswerAt(idx, e.target.value)}
+                    placeholder="e.g. Hidden object answer"
+                    className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
             </div>
           ))}
         </div>
@@ -653,11 +711,15 @@ export default function AdminPage() {
               <ImageUpload
                 value={form.url}
                 images={form.images}
-                onChange={(mainUrl, imagesList) => {
+                imageTitles={form.imageTitles}
+                imageAnswers={form.imageAnswers}
+                onChange={(mainUrl, imagesList, titlesList, answersList) => {
                   setForm((prev) => ({
                     ...prev,
                     url: mainUrl,
                     images: imagesList,
+                    imageTitles: titlesList,
+                    imageAnswers: answersList,
                   }));
                 }}
               />

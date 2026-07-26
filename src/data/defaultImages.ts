@@ -19,11 +19,18 @@ export const DEFAULT_TILE_STYLES: TileStyles = {
   tileGap:         3,
 };
 
-// ─── Game / Image preset ──────────────────────────────────────────────────────
+export interface ImageItem {
+  url:    string;
+  title?: string;
+  answer?: string;
+}
+
 export interface PresetImage {
   id:          string;
   url:         string;
   images?:     string[]; // optional list of multiple images for multi-round games
+  imageTitles?: string[]; // optional title per image slide
+  imageAnswers?: string[]; // optional answer per image slide
   name:        string;   // game / round name
   answer:      string;
   category:    string;

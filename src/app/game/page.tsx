@@ -281,12 +281,16 @@ export default function GameScreen() {
     setRevealsThisRound(0);
     setInputTile("");
 
-    // If game has multiple image slides for rounds, advance image URL to slide (next - 1)
+    // If game has multiple image slides for rounds, advance image URL, name & answer to slide (next - 1)
     if (currentGame.images && currentGame.images.length > 1) {
       const slideIndex = (next - 1) % currentGame.images.length;
+      const slideTitle = currentGame.imageTitles?.[slideIndex];
+      const slideAnswer = currentGame.imageAnswers?.[slideIndex];
       setCurrentGame((prev) => ({
         ...prev,
         url: prev.images![slideIndex],
+        ...(slideTitle ? { name: slideTitle } : {}),
+        ...(slideAnswer ? { answer: slideAnswer } : {}),
       }));
     }
 
