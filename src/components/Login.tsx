@@ -1,0 +1,2 @@
+// Deprecated — authentication removed
+export {};
