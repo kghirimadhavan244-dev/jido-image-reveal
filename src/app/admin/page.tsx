@@ -26,6 +26,13 @@ import {
   Upload,
 } from "lucide-react";
 
+import {
+  fetchGamesFromSupabase,
+  saveGameToSupabase,
+  deleteGameFromSupabase,
+  uploadImageToSupabaseStorage,
+} from "../../services/gameService";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 type AdminView = "library" | "edit";
 
@@ -122,16 +129,11 @@ function NumberInput({
     <input
       type="number"
       value={numStr(value)}
-      onChange={(e) => {
-        const n = safeInt(e.target.value, value);
-        if (min !== undefined && n < min) return;
-        if (max !== undefined && n > max) return;
-        onChange(n);
-      }}
+      onChange={(e) => onChange(safeInt(e.target.value, value))}
       min={min}
       max={max}
       step={step}
-      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
     />
   );
 }
@@ -174,8 +176,7 @@ function ColorInput({
   );
 }
 
-// ─── Image upload component ───────────────────────────────────────────────────
-// ─── Multi Image upload component ─────────────────────────────────────────────
+// ─── Multi Image upload component with Supabase Storage ───────────────────────
 function ImageUpload({
   value,
   images = [],
@@ -191,39 +192,36 @@ function ImageUpload({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   // Combine into a list
   const currentList = images.length > 0 ? images : value ? [value] : [];
   const titles = currentList.map((_, i) => imageTitles[i] ?? `Slide ${i + 1}`);
   const answers = currentList.map((_, i) => imageAnswers[i] ?? "");
 
-  const readFiles = (fileList: FileList | null) => {
+  const readFiles = async (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
     const files = Array.from(fileList).filter((f) => f.type.startsWith("image/"));
     if (files.length === 0) return;
 
-    let pending = files.length;
+    setUploading(true);
     const newUrls: string[] = [];
     const newTitles: string[] = [];
 
-    files.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        if (typeof e.target?.result === "string") {
-          newUrls.push(e.target.result);
-          const baseName = file.name.replace(/\.[^.]+$/, "");
-          newTitles.push(baseName);
-        }
-        pending--;
-        if (pending === 0) {
-          const updatedImages = [...currentList, ...newUrls];
-          const updatedTitles = [...titles, ...newTitles];
-          const updatedAnswers = [...answers, ...newUrls.map(() => "")];
-          onChange(updatedImages[0] ?? "", updatedImages, updatedTitles, updatedAnswers);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+    for (const file of files) {
+      const publicUrl = await uploadImageToSupabaseStorage(file, "slide");
+      if (publicUrl) {
+        newUrls.push(publicUrl);
+        const baseName = file.name.replace(/\.[^.]+$/, "");
+        newTitles.push(baseName);
+      }
+    }
+
+    const updatedImages = [...currentList, ...newUrls];
+    const updatedTitles = [...titles, ...newTitles];
+    const updatedAnswers = [...answers, ...newUrls.map(() => "")];
+    onChange(updatedImages[0] ?? "", updatedImages, updatedTitles, updatedAnswers);
+    setUploading(false);
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -259,9 +257,10 @@ function ImageUpload({
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            className="text-xs font-semibold text-blue-600 hover:text-blue-700 cursor-pointer flex items-center gap-1"
+            disabled={uploading}
+            className="text-xs font-semibold text-blue-600 hover:text-blue-700 cursor-pointer flex items-center gap-1 disabled:opacity-50"
           >
-            + Add Image
+            {uploading ? "Uploading to Storage…" : "+ Add Image"}
           </button>
         )}
       </div>
@@ -339,9 +338,9 @@ function ImageUpload({
           <ImageIcon size={28} className="text-slate-300" />
           <div className="text-center">
             <p className="text-sm font-medium text-slate-600">
-              Click to upload or drag &amp; drop images
+              {uploading ? "Uploading to Supabase Storage…" : "Click to upload or drag & drop images"}
             </p>
-            <p className="text-xs text-slate-400 mt-0.5">Upload one or multiple images for this game</p>
+            <p className="text-xs text-slate-400 mt-0.5">Images upload directly to Supabase Storage</p>
           </div>
         </div>
       )}
@@ -365,6 +364,7 @@ function ImageUpload({
 // ─── Main admin component ─────────────────────────────────────────────────────
 export default function AdminPage() {
   const [mounted,    setMounted]    = useState(false);
+  const [loading,    setLoading]    = useState(true);
   const [gamesList,  setGamesList]  = useState<PresetImage[]>([]);
   const [activeId,   setActiveId]   = useState<string>("");
   const [view,       setView]       = useState<AdminView>("library");
@@ -385,23 +385,17 @@ export default function AdminPage() {
     [],
   );
 
-  // ── Mount ──
+  // ── Mount: Load games from Supabase ──
   useEffect(() => {
-    const games = loadGames();
-    const migrated = games.map((g) => ({
-      ...DEFAULT_GAME,
-      ...g,
-      tileStyles: g.tileStyles ?? DEFAULT_TILE_STYLES,
-    } as PresetImage));
-    setGamesList(migrated);
-    setActiveId(loadActiveId() ?? "");
-    setMounted(true);
-  }, []);
-
-  // ── Persist ──
-  const persist = useCallback((list: PresetImage[]) => {
-    setGamesList(list);
-    saveGames(list);
+    async function loadData() {
+      setLoading(true);
+      const games = await fetchGamesFromSupabase();
+      setGamesList(games);
+      setActiveId(loadActiveId() ?? games[0]?.id ?? "");
+      setLoading(false);
+      setMounted(true);
+    }
+    loadData();
   }, []);
 
   // ── Open edit form ──
@@ -423,86 +417,97 @@ export default function AdminPage() {
     setEditingId(null);
   }, []);
 
-  // ── Save form ──
-  const handleSave = useCallback((e: React.FormEvent) => {
+  // ── Save form to Supabase ──
+  const handleSave = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingId !== null) {
-      const updated = gamesList.map((g) =>
-        g.id === editingId ? { ...g, ...form } : g,
-      );
-      persist(updated);
-    } else {
-      const newGame: PresetImage = {
-        ...form,
-        id:          `game-${Date.now()}`,
-        createdDate: new Date().toISOString(),
-      };
-      persist([...gamesList, newGame]);
+    setLoading(true);
+
+    const targetId = editingId ?? `game-${Date.now()}`;
+    const gameToSave: PresetImage = {
+      ...form,
+      id: targetId,
+      createdDate: new Date().toISOString(),
+    };
+
+    const saved = await saveGameToSupabase(gameToSave);
+    if (saved) {
+      if (editingId !== null) {
+        setGamesList((prev) => prev.map((g) => (g.id === editingId ? saved : g)));
+      } else {
+        setGamesList((prev) => [saved, ...prev]);
+      }
     }
+    setLoading(false);
     closeEdit();
-  }, [editingId, form, gamesList, persist, closeEdit]);
+  }, [editingId, form, closeEdit]);
 
-  // ── Delete ──
-  const handleDelete = useCallback((id: string) => {
-    persist(gamesList.filter((g) => g.id !== id));
-    if (activeId === id) {
-      setActiveId("");
-      localStorage.removeItem("jido_active_preset_id");
+  // ── Delete game from Supabase ──
+  const handleDelete = useCallback(async (id: string) => {
+    if (!confirm("Are you sure you want to delete this game?")) return;
+    setLoading(true);
+    const success = await deleteGameFromSupabase(id);
+    if (success) {
+      setGamesList((prev) => prev.filter((g) => g.id !== id));
+      if (activeId === id) {
+        setActiveId("");
+        saveActiveId("");
+      }
     }
-  }, [gamesList, activeId, persist]);
+    setLoading(false);
+  }, [activeId]);
 
-  // ── Set active ──
+  // ── Set active game ──
   const handleSetActive = useCallback((id: string) => {
     setActiveId(id);
     saveActiveId(id);
   }, []);
 
-  // ── Restore presets ──
-  const handleRestoreDefaults = useCallback(() => {
-    if (!confirm("Replace all games with the default presets?")) return;
-    persist([...PRESET_IMAGES]);
-    setActiveId("");
-    localStorage.removeItem("jido_active_preset_id");
-  }, [persist]);
+  // ── Restore default games to Supabase ──
+  const handleRestoreDefaults = useCallback(async () => {
+    if (!confirm("Restore default games to Supabase?")) return;
+    setLoading(true);
+    for (const preset of PRESET_IMAGES) {
+      await saveGameToSupabase(preset);
+    }
+    const refreshed = await fetchGamesFromSupabase();
+    setGamesList(refreshed);
+    setLoading(false);
+  }, []);
 
-  // ── Bulk image upload ──
+  // ── Bulk image upload to Supabase Storage ──
   const bulkInputRef = useRef<HTMLInputElement>(null);
 
   const handleBulkUpload = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
       const files = Array.from(e.target.files ?? []);
       if (files.length === 0) return;
 
-      let remaining = files.length;
-      const newGames: PresetImage[] = [];
+      setLoading(true);
+      for (const file of files) {
+        if (!file.type.startsWith("image/")) continue;
+        const publicUrl = await uploadImageToSupabaseStorage(file, "bulk");
+        if (publicUrl) {
+          const baseName = file.name.replace(/\.[^.]+$/, "");
+          const newGame: PresetImage = {
+            ...EMPTY_FORM,
+            id: `game-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            createdDate: new Date().toISOString(),
+            url: publicUrl,
+            images: [publicUrl],
+            imageTitles: [baseName],
+            name: baseName,
+            answer: baseName,
+          };
+          await saveGameToSupabase(newGame);
+        }
+      }
 
-      files.forEach((file) => {
-        if (!file.type.startsWith("image/")) { remaining--; return; }
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          if (typeof ev.target?.result === "string") {
-            const baseName = file.name.replace(/\.[^.]+$/, "");
-            newGames.push({
-              ...EMPTY_FORM,
-              id:          `game-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-              createdDate: new Date().toISOString(),
-              url:         ev.target.result,
-              name:        baseName,
-              answer:      baseName,
-            } as PresetImage);
-          }
-          remaining--;
-          if (remaining === 0) {
-            persist([...gamesList, ...newGames]);
-          }
-        };
-        reader.readAsDataURL(file);
-      });
-
-      // Reset the input so the same files can be re-selected
+      const refreshed = await fetchGamesFromSupabase();
+      setGamesList(refreshed);
+      setLoading(false);
       e.target.value = "";
     },
-    [gamesList, persist],
+    [],
   );
 
   // ─── Preview game (derived from form) ─────────────────────────────────────

@@ -18,6 +18,7 @@ import {
   saveGames,
   loadActiveId,
 } from "../../data/defaultImages";
+import { fetchGamesFromSupabase } from "../../services/gameService";
 import {
   Settings,
   Maximize2,
@@ -137,26 +138,28 @@ export default function GameScreen() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  // ── Mount: load games ──
+  // ── Mount: load games from Supabase ──
   useEffect(() => {
-    const games = loadGames();
-    // Migrate any old presets that lack tileStyles
-    const migrated = games.map((g) => ({
-      ...LOADING_IMAGE,
-      ...g,
-      tileStyles: g.tileStyles ?? LOADING_IMAGE.tileStyles,
-    }));
-    setGamesList(migrated);
+    async function loadData() {
+      const games = await fetchGamesFromSupabase();
+      const migrated = games.map((g) => ({
+        ...LOADING_IMAGE,
+        ...g,
+        tileStyles: g.tileStyles ?? LOADING_IMAGE.tileStyles,
+      }));
+      setGamesList(migrated);
 
-    const activeId = loadActiveId();
-    let idx = 0;
-    if (activeId) {
-      const found = migrated.findIndex((g) => g.id === activeId);
-      if (found !== -1) idx = found;
+      const activeId = loadActiveId();
+      let idx = 0;
+      if (activeId) {
+        const found = migrated.findIndex((g) => g.id === activeId);
+        if (found !== -1) idx = found;
+      }
+      setImageIndex(idx);
+      setCurrentGame(migrated[idx] ?? LOADING_IMAGE);
+      setMounted(true);
     }
-    setImageIndex(idx);
-    setCurrentGame(migrated[idx] ?? LOADING_IMAGE);
-    setMounted(true);
+    loadData();
   }, []);
 
   // ── Fullscreen listener ──

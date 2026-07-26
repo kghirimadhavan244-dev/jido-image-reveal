@@ -19,6 +19,7 @@ import {
   loadActiveId,
   PresetImage,
 } from "../data/defaultImages";
+import { fetchGamesFromSupabase } from "../services/gameService";
 
 export default function LandingPage() {
   const [mounted, setMounted] = useState(false);
@@ -26,12 +27,15 @@ export default function LandingPage() {
   const [totalGames, setTotalGames] = useState<number>(0);
 
   useEffect(() => {
-    setMounted(true);
-    const games = loadGames();
-    const activeId = loadActiveId();
-    setTotalGames(games.length);
-    const current = games.find((g) => g.id === activeId) || games[0] || null;
-    setActiveGame(current);
+    async function loadData() {
+      const games = await fetchGamesFromSupabase();
+      const activeId = loadActiveId();
+      setTotalGames(games.length);
+      const current = games.find((g) => g.id === activeId) || games[0] || null;
+      setActiveGame(current);
+      setMounted(true);
+    }
+    loadData();
   }, []);
 
   if (!mounted) {

@@ -222,14 +222,24 @@ export function loadGames(): PresetImage[] {
   try {
     const raw = localStorage.getItem(LS_IMAGES);
     if (!raw) return PRESET_IMAGES;
-    return JSON.parse(raw) as PresetImage[];
-  } catch {
+    const parsed = JSON.parse(raw) as PresetImage[];
+    return parsed.length > 0 ? parsed : PRESET_IMAGES;
+  } catch (err) {
+    console.error("Failed to load games from localStorage:", err);
     return PRESET_IMAGES;
   }
 }
 
-export function saveGames(games: PresetImage[]): void {
-  localStorage.setItem(LS_IMAGES, JSON.stringify(games));
+export function saveGames(games: PresetImage[]): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    localStorage.setItem(LS_IMAGES, JSON.stringify(games));
+    return true;
+  } catch (err) {
+    console.error("localStorage quota exceeded when saving images:", err);
+    alert("Warning: Storage limit exceeded! Large image files could not be saved to localStorage. Try uploading smaller image files (PNG/JPG).");
+    return false;
+  }
 }
 
 export function loadActiveId(): string | null {
