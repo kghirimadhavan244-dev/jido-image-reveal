@@ -175,53 +175,95 @@ function ColorInput({
 }
 
 // ─── Image upload component ───────────────────────────────────────────────────
+// ─── Multi Image upload component ─────────────────────────────────────────────
 function ImageUpload({
   value,
+  images = [],
   onChange,
 }: {
   value: string;
-  onChange: (dataUrl: string) => void;
+  images?: string[];
+  onChange: (mainUrl: string, imagesList: string[]) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
-  const readFile = (file: File) => {
-    if (!file.type.startsWith("image/")) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      if (typeof e.target?.result === "string") {
-        onChange(e.target.result);
-      }
-    };
-    reader.readAsDataURL(file);
-  };
+  // Combine into a list
+  const currentList = images.length > 0 ? images : value ? [value] : [];
 
-  const handleFiles = (files: FileList | null) => {
-    if (files && files[0]) readFile(files[0]);
+  const readFiles = (fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
+    const files = Array.from(fileList).filter((f) => f.type.startsWith("image/"));
+    if (files.length === 0) return;
+
+    let pending = files.length;
+    const newUrls: string[] = [];
+
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (typeof e.target?.result === "string") {
+          newUrls.push(e.target.result);
+        }
+        pending--;
+        if (pending === 0) {
+          const updated = [...currentList, ...newUrls];
+          onChange(updated[0] ?? "", updated);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragging(false);
-    handleFiles(e.dataTransfer.files);
+    readFiles(e.dataTransfer.files);
+  };
+
+  const removeImageAt = (index: number) => {
+    const updated = currentList.filter((_, i) => i !== index);
+    onChange(updated[0] ?? "", updated);
   };
 
   return (
-    <div>
-      <FieldLabel>Image</FieldLabel>
-
-      {value ? (
-        /* Thumbnail with replace button */
-        <div className="relative rounded-xl overflow-hidden border border-slate-200 aspect-video bg-slate-100">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={value} alt="Preview" className="w-full h-full object-cover" />
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <FieldLabel>Game Images ({currentList.length})</FieldLabel>
+        {currentList.length > 0 && (
           <button
             type="button"
-            onClick={() => onChange("")}
-            className="absolute top-2 right-2 px-2.5 py-1 bg-white/90 hover:bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 shadow-sm transition-colors cursor-pointer"
+            onClick={() => inputRef.current?.click()}
+            className="text-xs font-semibold text-blue-600 hover:text-blue-700 cursor-pointer flex items-center gap-1"
           >
-            Replace
+            + Add Image
           </button>
+        )}
+      </div>
+
+      {currentList.length > 0 ? (
+        /* Image gallery grid */
+        <div className="grid grid-cols-2 gap-3">
+          {currentList.map((imgUrl, idx) => (
+            <div
+              key={idx}
+              className="relative rounded-xl overflow-hidden border border-slate-200 aspect-video bg-slate-100 group"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={imgUrl} alt={`Slide ${idx + 1}`} className="w-full h-full object-cover" />
+              <div className="absolute top-1.5 left-1.5 px-2 py-0.5 bg-black/60 text-white text-[10px] font-semibold rounded-full backdrop-blur-xs">
+                Slide {idx + 1}
+              </div>
+              <button
+                type="button"
+                onClick={() => removeImageAt(idx)}
+                className="absolute top-1.5 right-1.5 p-1 bg-red-600 hover:bg-red-700 text-white rounded-lg shadow-sm transition-opacity opacity-90 hover:opacity-100 cursor-pointer"
+                title="Remove image"
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          ))}
         </div>
       ) : (
         /* Drop zone */
@@ -239,9 +281,9 @@ function ImageUpload({
           <ImageIcon size={28} className="text-slate-300" />
           <div className="text-center">
             <p className="text-sm font-medium text-slate-600">
-              Click to upload or drag &amp; drop
+              Click to upload or drag &amp; drop images
             </p>
-            <p className="text-xs text-slate-400 mt-0.5">PNG, JPG, WEBP — any size</p>
+            <p className="text-xs text-slate-400 mt-0.5">Upload one or multiple images for this game</p>
           </div>
         </div>
       )}
@@ -251,8 +293,12 @@ function ImageUpload({
         ref={inputRef}
         type="file"
         accept="image/*"
+        multiple
         className="hidden"
-        onChange={(e) => handleFiles(e.target.files)}
+        onChange={(e) => {
+          readFiles(e.target.files);
+          e.target.value = "";
+        }}
       />
     </div>
   );
@@ -522,6 +568,7 @@ export default function AdminPage() {
                     <h3 className="font-semibold text-slate-900 text-sm truncate">{game.name}</h3>
                     <p className="text-xs text-slate-500 mt-0.5 mb-3">
                       {game.gridCols}×{game.gridRows} grid · {game.revealCount} rounds
+                      {game.images && game.images.length > 1 ? ` · ${game.images.length} slides` : ""}
                     </p>
 
                     <div className="flex gap-2">
@@ -605,7 +652,14 @@ export default function AdminPage() {
 
               <ImageUpload
                 value={form.url}
-                onChange={(url) => setField("url", url)}
+                images={form.images}
+                onChange={(mainUrl, imagesList) => {
+                  setForm((prev) => ({
+                    ...prev,
+                    url: mainUrl,
+                    images: imagesList,
+                  }));
+                }}
               />
 
               <div>

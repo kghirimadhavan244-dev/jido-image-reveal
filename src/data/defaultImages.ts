@@ -23,6 +23,7 @@ export const DEFAULT_TILE_STYLES: TileStyles = {
 export interface PresetImage {
   id:          string;
   url:         string;
+  images?:     string[]; // optional list of multiple images for multi-round games
   name:        string;   // game / round name
   answer:      string;
   category:    string;

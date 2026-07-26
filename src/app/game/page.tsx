@@ -280,8 +280,18 @@ export default function GameScreen() {
     setCurrentRound(next);
     setRevealsThisRound(0);
     setInputTile("");
+
+    // If game has multiple image slides for rounds, advance image URL to slide (next - 1)
+    if (currentGame.images && currentGame.images.length > 1) {
+      const slideIndex = (next - 1) % currentGame.images.length;
+      setCurrentGame((prev) => ({
+        ...prev,
+        url: prev.images![slideIndex],
+      }));
+    }
+
     playRoundTransition(next);
-  }, [canNextRound, currentRound]);
+  }, [canNextRound, currentRound, currentGame]);
 
   const handleRevealAnswer = useCallback(() => {
     if (!gameStarted) return;
