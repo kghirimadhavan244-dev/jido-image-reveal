@@ -27,13 +27,17 @@ export default function LandingPage() {
   const [totalGames, setTotalGames] = useState<number>(0);
 
   useEffect(() => {
+    setMounted(true);
     async function loadData() {
-      const games = await fetchGamesFromSupabase();
-      const activeId = loadActiveId();
-      setTotalGames(games.length);
-      const current = games.find((g) => g.id === activeId) || games[0] || null;
-      setActiveGame(current);
-      setMounted(true);
+      try {
+        const games = await fetchGamesFromSupabase();
+        const activeId = loadActiveId();
+        setTotalGames(games.length);
+        const current = games.find((g) => g.id === activeId) || games[0] || null;
+        setActiveGame(current);
+      } catch (err) {
+        console.error("Landing page load error:", err);
+      }
     }
     loadData();
   }, []);

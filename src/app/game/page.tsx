@@ -140,24 +140,28 @@ export default function GameScreen() {
 
   // ── Mount: load games from Supabase ──
   useEffect(() => {
+    setMounted(true);
     async function loadData() {
-      const games = await fetchGamesFromSupabase();
-      const migrated = games.map((g) => ({
-        ...LOADING_IMAGE,
-        ...g,
-        tileStyles: g.tileStyles ?? LOADING_IMAGE.tileStyles,
-      }));
-      setGamesList(migrated);
+      try {
+        const games = await fetchGamesFromSupabase();
+        const migrated = games.map((g) => ({
+          ...LOADING_IMAGE,
+          ...g,
+          tileStyles: g.tileStyles ?? LOADING_IMAGE.tileStyles,
+        }));
+        setGamesList(migrated);
 
-      const activeId = loadActiveId();
-      let idx = 0;
-      if (activeId) {
-        const found = migrated.findIndex((g) => g.id === activeId);
-        if (found !== -1) idx = found;
+        const activeId = loadActiveId();
+        let idx = 0;
+        if (activeId) {
+          const found = migrated.findIndex((g) => g.id === activeId);
+          if (found !== -1) idx = found;
+        }
+        setImageIndex(idx);
+        setCurrentGame(migrated[idx] ?? LOADING_IMAGE);
+      } catch (err) {
+        console.error("Game page load error:", err);
       }
-      setImageIndex(idx);
-      setCurrentGame(migrated[idx] ?? LOADING_IMAGE);
-      setMounted(true);
     }
     loadData();
   }, []);

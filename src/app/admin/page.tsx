@@ -387,13 +387,18 @@ export default function AdminPage() {
 
   // ── Mount: Load games from Supabase ──
   useEffect(() => {
+    setMounted(true);
     async function loadData() {
-      setLoading(true);
-      const games = await fetchGamesFromSupabase();
-      setGamesList(games);
-      setActiveId(loadActiveId() ?? games[0]?.id ?? "");
-      setLoading(false);
-      setMounted(true);
+      try {
+        setLoading(true);
+        const games = await fetchGamesFromSupabase();
+        setGamesList(games);
+        setActiveId(loadActiveId() ?? games[0]?.id ?? "");
+      } catch (err) {
+        console.error("Admin page load error:", err);
+      } finally {
+        setLoading(false);
+      }
     }
     loadData();
   }, []);
