@@ -182,6 +182,8 @@ export default function GameScreen() {
     loadSpecificImage(prevIdx);
   }, [gamesList.length, imageIndex, loadSpecificImage]);
 
+  const [guestGuessInput, setGuestGuessInput] = useState("");
+
   // ── Core Host Reveal Execution ──
   const executePhysicalReveal = useCallback((physIdx: number, displayNum: number) => {
     if (isAnswerRevealed) return;
@@ -196,13 +198,40 @@ export default function GameScreen() {
     setRevealedHistory((prev) => [...prev, displayNum]);
     setSelectedTileInput("");
     playTone(600, 0.15);
-    setToast({ text: `Revealed Tile #${displayNum}`, type: "success" });
 
-    // Advance current round counter up to maxRounds
-    if (currentRound < maxRounds) {
-      setCurrentRound((prev) => prev + 1);
+    // Auto reveal full answer when max round tiles (e.g. 5 tiles) are turned
+    if (nextSet.size >= maxRounds) {
+      const all = new Set(Array.from({ length: cols * rows }, (_, i) => i));
+      setRevealedTiles(all);
+      setIsAnswerRevealed(true);
+      playTone(880, 0.4, 0.2);
+      setToast({ text: `All ${maxRounds} tiles revealed! Showing answer.`, type: "success" });
+    } else {
+      setToast({ text: `Revealed Tile #${displayNum}`, type: "success" });
+      setCurrentRound((prev) => Math.min(maxRounds, prev + 1));
     }
-  }, [isAnswerRevealed, revealedTiles, currentRound, maxRounds]);
+  }, [isAnswerRevealed, revealedTiles, maxRounds, cols, rows]);
+
+  // Audience Guess Check Handler (e.g. Round 2 guess)
+  const handleCheckGuessSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    if (!guestGuessInput.trim() || isAnswerRevealed) return;
+
+    const userGuess = guestGuessInput.trim().toLowerCase();
+    const targetAnswer = currentAnswerName.trim().toLowerCase();
+
+    if (userGuess === targetAnswer || targetAnswer.includes(userGuess) || userGuess.includes(targetAnswer)) {
+      // Correct guess! Reveal full answer immediately
+      const all = new Set(Array.from({ length: cols * rows }, (_, i) => i));
+      setRevealedTiles(all);
+      setIsAnswerRevealed(true);
+      playTone(880, 0.5, 0.3);
+      setToast({ text: `Correct Guess! Answer: ${currentAnswerName}`, type: "success" });
+      setGuestGuessInput("");
+    } else {
+      setToast({ text: `Incorrect guess: "${guestGuessInput.trim()}"`, type: "error" });
+    }
+  }, [guestGuessInput, isAnswerRevealed, currentAnswerName, cols, rows]);
 
   // Direct Grid Click Handler
   const handleGridClick = useCallback((physIdx: number) => {
@@ -394,6 +423,7 @@ export default function GameScreen() {
               Host Controls
             </div>
 
+            {/* Host Tile Input Form */}
             <form onSubmit={handleFormRevealSubmit} className="flex items-center gap-2">
               <input
                 ref={inputRef}
@@ -403,29 +433,48 @@ export default function GameScreen() {
                 placeholder={`Tile #${startRange}–${endRange}`}
                 value={selectedTileInput}
                 onChange={(e) => setSelectedTileInput(e.target.value)}
-                disabled={isAnswerRevealed}
-                className="w-32 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-40"
+                disabled={isAnswerRevealed || totalRevealed >= maxRounds}
+                className="w-28 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-40"
               />
               <button
                 type="submit"
-                disabled={isAnswerRevealed || !selectedTileInput.trim()}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-white font-semibold text-xs rounded-lg border border-slate-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                disabled={isAnswerRevealed || totalRevealed >= maxRounds || !selectedTileInput.trim()}
+                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-white font-semibold text-xs rounded-lg border border-slate-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
                 Reveal Tile
+              </button>
+            </form>
+
+            {/* Audience Guess Input Form */}
+            <form onSubmit={handleCheckGuessSubmit} className="flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Type audience guess..."
+                value={guestGuessInput}
+                onChange={(e) => setGuestGuessInput(e.target.value)}
+                disabled={isAnswerRevealed}
+                className="w-40 bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-40"
+              />
+              <button
+                type="submit"
+                disabled={isAnswerRevealed || !guestGuessInput.trim()}
+                className="px-3.5 py-2 bg-emerald-700 hover:bg-emerald-600 active:bg-emerald-800 text-white font-semibold text-xs rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Check Guess
               </button>
             </form>
           </div>
 
           {/* Round Stats & Revealed Tile History */}
-          <div className="flex items-center gap-6 text-xs text-slate-400">
+          <div className="flex items-center gap-5 text-xs text-slate-400">
             <div>
               Current Round: <strong className="text-white">{currentRound} / {maxRounds}</strong>
             </div>
             <div>
-              Remaining Chances: <strong className="text-white">{Math.max(0, maxRounds - totalRevealed)}</strong>
+              Remaining Chances: <strong className={totalRevealed >= maxRounds ? "text-rose-400 font-bold" : "text-white"}>{Math.max(0, maxRounds - totalRevealed)}</strong>
             </div>
             {revealedHistory.length > 0 && (
-              <div className="hidden sm:block truncate max-w-xs text-slate-400">
+              <div className="hidden xl:block truncate max-w-xs text-slate-400">
                 Revealed: <span className="text-slate-300 font-mono">{revealedHistory.join(", ")}</span>
               </div>
             )}
@@ -435,7 +484,7 @@ export default function GameScreen() {
           <div className="flex items-center gap-3 w-full lg:w-auto justify-end">
             <button
               onClick={handleRevealAnswer}
-              disabled={!isFinalRound || isAnswerRevealed}
+              disabled={isAnswerRevealed}
               className="px-5 py-2 bg-amber-600/90 hover:bg-amber-600 active:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1.5"
             >
               <Eye size={15} />
