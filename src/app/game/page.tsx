@@ -509,7 +509,8 @@ export default function GameScreen() {
         show={isAnswerRevealed}
         answer={currentAnswerName}
         mode="REVEALED"
-        onClose={() => {}}
+        onClose={resetImageState}
+        onNextImage={handleNextImage}
       />
     </div>
   );

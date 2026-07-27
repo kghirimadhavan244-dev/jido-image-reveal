@@ -5,13 +5,14 @@ import confetti from "canvas-confetti";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface CelebrationProps {
-  show:    boolean;
-  answer:  string;
-  mode:    "WON" | "REVEALED";
-  onClose: () => void;
+  show:        boolean;
+  answer:      string;
+  mode:        "WON" | "REVEALED";
+  onClose:     () => void;
+  onNextImage?: () => void;
 }
 
-export function Celebration({ show, answer, mode, onClose }: CelebrationProps) {
+export function Celebration({ show, answer, mode, onClose, onNextImage }: CelebrationProps) {
   useEffect(() => {
     if (!show || mode !== "WON") return;
     const end = Date.now() + 3500;
@@ -47,10 +48,10 @@ export function Celebration({ show, answer, mode, onClose }: CelebrationProps) {
             animate={{ scale: 1,    opacity: 1, y: 0  }}
             exit={{    scale: 0.85, opacity: 0, y: 24  }}
             transition={{ type: "spring", damping: 22, stiffness: 180 }}
-            className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-10 text-center"
+            className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-8 text-center"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="text-5xl mb-5 leading-none">
+            <div className="text-5xl mb-4 leading-none">
               {mode === "WON" ? "🎉" : "👁️"}
             </div>
 
@@ -58,16 +59,26 @@ export function Celebration({ show, answer, mode, onClose }: CelebrationProps) {
               {mode === "WON" ? "Correct Answer!" : "Answer Revealed"}
             </p>
 
-            <h2 className="text-3xl font-bold text-slate-900 mb-8 leading-tight">
+            <h2 className="text-3xl font-bold text-slate-900 mb-6 leading-tight">
               {answer}
             </h2>
 
-            <button
-              onClick={onClose}
-              className="w-full bg-slate-900 hover:bg-slate-700 active:bg-slate-800 text-white font-semibold py-3 rounded-xl transition-colors duration-150 text-sm cursor-pointer"
-            >
-              Reset Game
-            </button>
+            <div className="flex flex-col gap-2.5">
+              {onNextImage && (
+                <button
+                  onClick={onNextImage}
+                  className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold py-3 rounded-xl transition-colors duration-150 text-sm cursor-pointer shadow-md"
+                >
+                  Next Image →
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="w-full bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-semibold py-2.5 rounded-xl transition-colors duration-150 text-xs cursor-pointer"
+              >
+                Replay Image
+              </button>
+            </div>
           </motion.div>
         </motion.div>
       )}
