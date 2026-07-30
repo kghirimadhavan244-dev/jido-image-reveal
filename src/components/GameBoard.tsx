@@ -65,8 +65,8 @@ export function GameBoard({
         style={{
           gridTemplateColumns: `repeat(${cols}, 1fr)`,
           gridTemplateRows:    `repeat(${rows}, 1fr)`,
-          gap:                 `${styles.tileGap}px`,
-          padding:             `${styles.tileGap}px`,
+          gap:                 `${styles.tileGap ?? 0}px`,
+          padding:             `${styles.tileGap ?? 0}px`,
         }}
       >
         {tiles.map(({ idx, displayNum }) => (

@@ -10,13 +10,13 @@ export interface TileStyles {
 }
 
 export const DEFAULT_TILE_STYLES: TileStyles = {
-  cornerRadius:    4,
+  cornerRadius:    0,
   borderThickness: 1,
   fontSize:        12,
   numberColor:     "#94A3B8",
   borderColor:     "#334155",
   bgOpacity:       1,
-  tileGap:         3,
+  tileGap:         0,
 };
 
 export interface ImageItem {
